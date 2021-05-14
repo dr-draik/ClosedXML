@@ -250,6 +250,68 @@ namespace ClosedXML.Tests.Excel.CalcEngine
         }
 
         [Test]
+        public void MMult_HandlesNonSquareMatrices()
+        {
+            IXLWorksheet ws = new XLWorkbook().AddWorksheet("Sheet1");
+            ws.Cell("A1").SetValue(1).CellRight().SetValue(3).CellRight().SetValue(5);
+            ws.Cell("A2").SetValue(2).CellRight().SetValue(4).CellRight().SetValue(6);
+
+            ws.Cell("A3").SetValue(10).CellRight().SetValue(13);
+            ws.Cell("A4").SetValue(11).CellRight().SetValue(14);
+            ws.Cell("A5").SetValue(12).CellRight().SetValue(15);
+
+            Object actual;
+
+            // 2x2 output expected:
+            // 103, 130
+            // 136, 172
+            ws.Cell("A7").FormulaA1 = "MMult(A1:C2, A3:B5)";
+
+            actual = ws.Cell("A7").Value;
+            Assert.AreEqual(103.0, actual);
+
+            ws.Cell("A8").FormulaA1 = "Sum(MMult(A1:C2, A3:B5))";
+            actual = ws.Cell("A8").Value;
+
+            Assert.AreEqual(541.0, actual);
+
+            // 3x3 output expected:
+            // 36, 82, 128
+            // 39, 89, 139
+            // 42, 96, 150
+            ws.Cell("A10").FormulaA1 = "MMult(A3:B5, A1:C2)";
+
+            actual = ws.Cell("A10").Value;
+            Assert.AreEqual(36.0, actual);
+
+            ws.Cell("A11").FormulaA1 = "Sum(MMult(A3:B5, A1:C2))";
+            actual = ws.Cell("A11").Value;
+
+            Assert.AreEqual(801.0, actual);
+        }
+
+        [TestCase("A2", "C2", "A3", "C3")] // 1x3 and 1x3
+        [TestCase("A2", "C4", "A5", "A7")] // 3x3 and 3x1
+        [TestCase("A2", "C5", "A6", "D6")] // 3x4 and 1x4
+        public void MMult_ThrowsWhenArray1RowsNotEqualToArray2Cols(string array1Start, string array1Finish, string array2Start, string array2Finish)
+        {
+            IXLWorksheet ws = new XLWorkbook().AddWorksheet("Sheet1");
+
+            ws.Cells($"{array1Start}:{array1Finish}").Value = 1.0;
+            ws.Cells($"{array2Start}:{array2Finish}").Value = 1.0;
+
+            ws.Cell("A1").FormulaA1 = $"MMULT({array1Start}:{array1Finish},{array2Start}:{array2Finish})";
+
+            var error = Assert.Throws<ArgumentException>(() =>
+                {
+                    var val = ws.Cell("A1").Value;
+                }
+            );
+
+            Assert.AreEqual("Range 1 must have the same number of rows as range 2 has columns.", error.Message);
+        }
+
+        [Test]
         public void Mod()
         {
             object actual = XLWorkbook.EvaluateExpr("Mod(3, 2)");
